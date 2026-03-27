@@ -61,15 +61,42 @@ async function runMockAgent() {
         const items = [{ id: 'premium_data_access', quantity: 1, price: 15.00 }];
         console.log(`[AGENT] Requesting checkout for 15.00 USDT...`);
         
-        const createRes = await axios.post(checkoutUrl, {
-            items,
-            total_amount: 15.00,
-            chain: 'TRON_NILE',
-            currency: 'USDT',
-            customer_hash: AGENT_ID
-        });
+        let createRes;
+        try {
+            createRes = await axios.post(checkoutUrl, {
+                items,
+                total_amount: 15.00,
+                chain: 'TRON_NILE',
+                currency: 'USDT',
+                customer_hash: AGENT_ID
+            });
+        } catch (e) {}
 
-        const challenge = createRes.data;
+        const initialChallenge = createRes ? createRes.data : null;
+        let challenge = null;
+
+        if (createRes.status === 202 && initialChallenge.status === 'AWAITING_2FA') {
+            console.log(`[AGENT] 🔒 Checkout suspended by Merchant: ${initialChallenge.message}`);
+            console.log(`[AGENT] Awaiting out-of-band Human 2FA Appoval to release payload...`);
+            
+            const pollUrl = `${MERCHAT_BASE_URL}${initialChallenge.poll_url}`;
+
+            let approved = false;
+            while (!approved) {
+                await sleep(2000);
+                const pollRes = await axios.get(pollUrl);
+                if (pollRes.status === 200) {
+                    challenge = pollRes.data;
+                    approved = true;
+                    console.log(`\n[AGENT] 🔓 2FA Hit Received! Human approved the transaction.\n`);
+                } else if (pollRes.status === 202) {
+                    process.stdout.write('.');
+                }
+            }
+        } else {
+            challenge = initialChallenge;
+        }
+
         console.log(`[AGENT] Received UCP Checkout Challenge!`);
         console.log(`    Order ID: ${challenge.orderId}`);
         console.log(`    Pay To:   ${challenge.payment_challenge.receiver_address}`);

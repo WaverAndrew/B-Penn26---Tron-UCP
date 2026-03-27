@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const { exec } = require('child_process');
 const { TronWeb } = require('tronweb');
+const TelegramBot = require('node-telegram-bot-api');
 const db = require('./db');
 
 const app = express();
@@ -10,18 +11,60 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
-const MERCHANT_ADDRESS = process.env.MERCHANT_ADDRESS || 'TWd4b1a2b3c4d5e6f7g8h9i0j1k2l3m4n5'; // Placeholder
+const MERCHANT_ADDRESS = process.env.MERCHANT_ADDRESS || 'TWd4b1a2b3c4d5e6f7g8h9i0j1k2l3m4n5';
 
-// Initialize TronWeb for Nile Testnet
-// We only need to read data for the backend, so a private key is optional but we can pass a dummy one if required by tronweb.
+// Initialize TronWeb 
 const tronWeb = new TronWeb({
     fullNode: 'https://nile.trongrid.io',
     solidityNode: 'https://nile.trongrid.io',
     eventServer: 'https://nile.trongrid.io',
 });
 
+// Initialize Telegram Bot 
+const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+let bot = null;
+
+if (TELEGRAM_TOKEN) {
+    bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
+    console.log(`[Security] Telegram HITL 2FA Enabled.`);
+
+    bot.onText(/\/start/, (msg) => {
+        console.log(`\n========== TELEGRAM SETUP ==========`);
+        console.log(`Your Chat ID is: ${msg.chat.id}`);
+        console.log(`Please add TELEGRAM_CHAT_ID=${msg.chat.id} to your .env and restart the server!`);
+        console.log(`====================================\n`);
+        bot.sendMessage(msg.chat.id, `Welcome to the UCP Gateway! Your Chat ID is ${msg.chat.id}. Add this to your .env file as TELEGRAM_CHAT_ID.`);
+    });
+    
+    bot.on('callback_query', (query) => {
+        const action = query.data;
+        const msg = query.message;
+        
+        if (action.startsWith('approve_')) {
+            const orderId = action.split('approve_')[1];
+            db.updateOrder(orderId, { status: 'PENDING', updatedAt: new Date().toISOString() });
+            bot.editMessageText(`✅ Approved UCP Checkout: ${orderId}`, {
+                chat_id: msg.chat.id,
+                message_id: msg.message_id
+            });
+            console.log(`[Security] Order ${orderId} explicitly APPROVED via Telegram 2FA.`);
+        } else if (action.startsWith('reject_')) {
+            const orderId = action.split('reject_')[1];
+            db.updateOrder(orderId, { status: 'REJECTED', updatedAt: new Date().toISOString() });
+            bot.editMessageText(`❌ Rejected UCP Checkout: ${orderId}`, {
+                chat_id: msg.chat.id,
+                message_id: msg.message_id
+            });
+            console.log(`[Security] Order ${orderId} officially REJECTED via Telegram 2FA.`);
+        }
+    });
+} else {
+    console.warn(`[Security] No TELEGRAM_BOT_TOKEN found in .env. HITL 2FA will run in mock local mode.`);
+}
+
 /**
- * 1. UCP Discovery (The Manifest)
+ * 1. UCP Discovery
  */
 app.get('/.well-known/ucp', (req, res) => {
     res.json({
@@ -35,39 +78,80 @@ app.get('/.well-known/ucp', (req, res) => {
 });
 
 /**
- * 2. UCP Checkout Create
+ * 2. UCP Checkout Create (Now Intercepted for 2FA)
  */
 app.post('/api/ucp/checkout/create', (req, res) => {
     const { items, currency, total_amount } = req.body;
 
-    if (currency !== 'USDT') {
-        return res.status(400).json({ error: "Only USDT is supported." });
-    }
+    if (currency !== 'USDT') return res.status(400).json({ error: "Only USDT is supported." });
 
-    // Generate a unique order ID
     const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    
-    // In TRON, TRC20 USDT usually has 6 decimals.
-    // So 1 USDT = 1,000,000 "Sun-equivalent" base units for the mock TRC20, or we follow the prompt's `1 USDT = 1,000,000 Sun`
     const amountInSun = total_amount * 1_000_000;
 
-    // Save strictly to DB
+    // Freeze request at AWAITING_2FA
     const newOrder = db.createOrder({
         id: orderId,
         items,
         total_amount: total_amount,
         amount_in_sun: amountInSun,
         currency,
-        status: 'PENDING',
+        status: 'AWAITING_2FA',
         txHash: null,
         createdAt: new Date().toISOString()
     });
 
-    res.json({
+    const approveMsg = `🚨 *UCP Agent Checkout Request*\nAgent is requesting to spend *${total_amount} USDT* on TRON.\nOrder ID: \`${orderId}\``;
+    
+    if (bot && TELEGRAM_CHAT_ID) {
+        bot.sendMessage(TELEGRAM_CHAT_ID, approveMsg, {
+            parse_mode: 'Markdown',
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: '✅ Approve', callback_data: `approve_${orderId}` }],
+                    [{ text: '❌ Reject', callback_data: `reject_${orderId}` }]
+                ]
+            }
+        });
+    } else {
+        console.log(`\n---------------------------------`);
+        console.log(`[MOCK TELEGRAM 2FA APP]`);
+        console.log(approveMsg);
+        console.log(`To approve locally, run: curl -X POST http://localhost:${PORT}/api/demo/approve-2fa/${orderId}`);
+        console.log(`---------------------------------\n`);
+    }
+
+    // Return 202 instead of 200, halting the agent pipeline until out-of-band approval
+    return res.status(202).json({
         orderId: newOrder.id,
+        status: "AWAITING_2FA",
+        message: "Checkout suspended. Awaiting cryptographically signed human approval via Telegram.",
+        poll_url: `/api/ucp/checkout/challenge/${orderId}`
+    });
+});
+
+/**
+ * 2.5 New Challenge Polling Endpoint
+ * Agent loops here until 2FA completes.
+ */
+app.get('/api/ucp/checkout/challenge/:orderId', (req, res) => {
+    const order = db.getOrderById(req.params.orderId);
+    if (!order) return res.status(404).json({ error: "Order not found" });
+
+    if (order.status === 'AWAITING_2FA') {
+        return res.status(202).json({ status: "AWAITING_2FA" });
+    }
+    
+    if (order.status === 'REJECTED') {
+        return res.status(403).json({ error: "Checkout was permanently rejected by human intervention." });
+    }
+
+    // If PENDING (approved by human on Telegram), release the TRC-20 challenge
+    res.json({
+        orderId: order.id,
+        status: order.status,
         payment_challenge: {
             receiver_address: MERCHANT_ADDRESS,
-            amount: amountInSun,
+            amount: order.amount_in_sun.toString(),
             currency: "TRC20_USDT",
             network: "TRON_NILE"
         }
@@ -85,63 +169,43 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 app.post('/api/ucp/checkout/complete', async (req, res) => {
     const { orderId, transactionHash } = req.body;
 
-    if (!orderId || !transactionHash) {
-        return res.status(400).json({ error: "Missing orderId or transactionHash." });
-    }
+    if (!orderId || !transactionHash) return res.status(400).json({ error: "Missing orderId or transactionHash." });
 
     const order = db.getOrderById(orderId);
-    if (!order) {
-        return res.status(404).json({ error: "Order not found." });
-    }
-
-    if (order.status === 'PAID') {
-        return res.json({ status: "Success", message: "Order is already paid." });
-    }
+    if (!order) return res.status(404).json({ error: "Order not found." });
+    if (order.status === 'PAID') return res.json({ status: "Success", message: "Order is already paid." });
 
     try {
         let transaction = null;
         let retries = 5;
         
-        // Polling loop to ensure the transaction is picked up by Nile node
         while (retries > 0) {
             try {
                 transaction = await tronWeb.trx.getTransaction(transactionHash);
                 if (transaction && transaction.ret && transaction.ret[0].contractRet === 'SUCCESS') {
                     break;
                 }
-            } catch (err) {
-                // Ignore err, just means tx not found yet
-            }
+            } catch (err) {}
             console.log(`Waiting for transaction ${transactionHash} to be confirmed... (${retries} retries left)`);
-            await delay(3000); // 3-second delay
+            await delay(3000);
             retries--;
         }
 
         if (!transaction || !transaction.ret || transaction.ret[0].contractRet !== 'SUCCESS') {
-            return res.status(400).json({ error: "Transaction not found or not successful yet. Please try again later." });
+            return res.status(400).json({ error: "Transaction not successful yet." });
         }
 
         const contractData = transaction.raw_data.contract[0];
-        
-        // TRC20 transfers are Smart Contract triggers (TriggerSmartContract)
         if (contractData.type !== 'TriggerSmartContract') {
             return res.status(400).json({ error: "Invalid transaction type for TRC20 transfer." });
         }
 
         const parameter = contractData.parameter.value;
-        // In a real scenario, we should decode parameter.data to check recipient and amount,
-        // and verify it matches parameter.contract_address for the USDT contract on Nile.
-        // For this PoC, we will accept the successful smart contract trigger as proof for the presentation,
-        // but we'll do a simple check.
-        
-        // Decode data manually for basic safety if possible, but tronweb provides tools for it.
-        // Data signature for `transfer(address,uint256)` is `a9059cbb`.
         const data = parameter.data;
         if (!data || !data.startsWith('a9059cbb')) {
             return res.status(400).json({ error: "Not a valid token transfer transaction." });
         }
 
-        // We can confidently mark the order as PAID for PoC since the trigger was successful
         db.updateOrder(orderId, {
             status: 'PAID',
             txHash: transactionHash,
@@ -161,24 +225,21 @@ app.post('/api/ucp/checkout/complete', async (req, res) => {
  */
 app.get('/api/orders', (req, res) => {
     const orders = db.getOrders();
-    // Sort descending by createdAt
     orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     res.json(orders);
 });
 
 /**
  * 5. Premium API Gate (HTTP 402 Payment Required)
- * Demonstrates the x402-inspired AI micropayment wall.
  */
 app.get('/api/premium-data', (req, res) => {
     const authHeader = req.headers['authorization'];
     
-    // Check if the agent presented a valid UCP payment receipt (in this PoC, a txHash)
     if (!authHeader || !authHeader.startsWith('UCP ')) {
         res.setHeader('WWW-Authenticate', `UCP url="http://localhost:${PORT}/.well-known/ucp"`);
         return res.status(402).json({
             error: "Payment Required",
-            message: "This is a premium AI API endpoint. Please complete a UCP checkout session to generate a payment receipt.",
+            message: "Premium AI Endpoint. Complete UCP checkout.",
             cost: "15 USDT",
             currency: "TRX_USDT",
             ucp_manifest: `http://localhost:${PORT}/.well-known/ucp`
@@ -186,29 +247,28 @@ app.get('/api/premium-data', (req, res) => {
     }
 
     const receiptTxHash = authHeader.split(' ')[1];
-    
-    // Verify the receipt against our database
     const orders = db.getOrders();
     const validOrder = orders.find(o => o.txHash === receiptTxHash && o.status === 'PAID');
     
-    if (!validOrder) {
-        return res.status(403).json({ error: "Forbidden", message: "Invalid or unconfirmed UCP payment receipt." });
-    }
+    if (!validOrder) return res.status(403).json({ error: "Forbidden", message: "Invalid payment receipt." });
 
-    // Success! Return the premium AI payload
     return res.status(200).json({
         success: true,
-        data: {
-            confidential_ai_model_weights: "0x8fa9b2...34df",
-            weather_forecast: "72°F and sunny in Silicon Valley",
-            alpha_signals: ["LONG $TRX", "SHORT $FIAT"]
-        },
+        data: { confidential_ai_model_weights: "0x8fa9b2...34df", weather_forecast: "72°F and sunny in Silicon Valley", alpha_signals: ["LONG $TRX", "SHORT $FIAT"] },
         receipt_used: receiptTxHash
     });
 });
 
 /**
- * 6. Demo Endpoint for Visual UI
+ * 6. Demo Approval Endpoint (In absence of Telegram API)
+ */
+app.post('/api/demo/approve-2fa/:orderId', (req, res) => {
+    db.updateOrder(req.params.orderId, { status: 'PENDING', updatedAt: new Date().toISOString() });
+    res.json({ success: true, message: `Order ${req.params.orderId} approved locally.` });
+});
+
+/**
+ * 7. Demo Endpoint for Visual UI
  */
 app.post('/api/demo/run-agent', (req, res) => {
     exec('node test-agent.js', (error, stdout, stderr) => {
