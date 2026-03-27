@@ -103,7 +103,7 @@ async function runMockAgent() {
         console.log(`    Amount:   ${challenge.payment_challenge.amount} SUN (15 USDT)\n`);
 
         // Step 4: Autonomous Crypto Wallet Interaction (TRC-20 Transfer)
-        const trc20ContractAddress = 'TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj'; // Nile USDT
+        const trc20ContractAddress = 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf'; // User's Funded Nile USDT
         const destinationAddress = challenge.payment_challenge.receiver_address;
         const amountSun = parseInt(challenge.payment_challenge.amount);
 
@@ -133,8 +133,8 @@ async function runMockAgent() {
         const receipt = await tronWeb.trx.sendRawTransaction(signedTx);
         const txHash = signedTx.txID;
         console.log(`[AGENT] => Broadcast Successful! Transaction Hash: ${txHash}`);
-        console.log(`[AGENT] Waiting 5 seconds for block propagation...\n`);
-        await sleep(5000); 
+        console.log(`[AGENT] Waiting 10 seconds for block propagation...\n`);
+        await sleep(10000); 
 
         // Step 5: Notify Merchant Backend to verify txHash
         console.log(`[AGENT] Pinging UCP checkout/complete endpoint to verify Payment Challenge...`);

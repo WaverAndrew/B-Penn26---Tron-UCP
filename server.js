@@ -175,9 +175,16 @@ app.post('/api/ucp/checkout/complete', async (req, res) => {
     if (!order) return res.status(404).json({ error: "Order not found." });
     if (order.status === 'PAID') return res.json({ status: "Success", message: "Order is already paid." });
 
+    // Optimistically update DB to display the txHash on the frontend instantly
+    db.updateOrder(orderId, {
+        status: 'VERIFYING',
+        txHash: transactionHash,
+        updatedAt: new Date().toISOString()
+    });
+
     try {
         let transaction = null;
-        let retries = 5;
+        let retries = 20;
         
         while (retries > 0) {
             try {
@@ -192,11 +199,13 @@ app.post('/api/ucp/checkout/complete', async (req, res) => {
         }
 
         if (!transaction || !transaction.ret || transaction.ret[0].contractRet !== 'SUCCESS') {
+            db.updateOrder(orderId, { status: 'FAILED', updatedAt: new Date().toISOString() });
             return res.status(400).json({ error: "Transaction not successful yet." });
         }
 
         const contractData = transaction.raw_data.contract[0];
         if (contractData.type !== 'TriggerSmartContract') {
+            db.updateOrder(orderId, { status: 'FAILED', updatedAt: new Date().toISOString() });
             return res.status(400).json({ error: "Invalid transaction type for TRC20 transfer." });
         }
 

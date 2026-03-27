@@ -274,6 +274,7 @@ function App() {
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
 
   const fetchOrders = async () => {
+    setLoading(true);
     try {
       const res = await fetch('http://localhost:3000/api/orders');
       if (res.ok) {
@@ -282,7 +283,7 @@ function App() {
     } catch (err) {
       console.error("Failed to fetch orders:", err);
     } finally {
-      setLoading(false);
+      setTimeout(() => setLoading(false), 500);
     }
   };
 
@@ -352,6 +353,14 @@ function App() {
             <Play className="fill-white w-3 h-3" /> Run Live Demo Agent
           </button>
           
+          <button 
+            onClick={fetchOrders}
+            className="p-1.5 bg-[#18181b] rounded-md border border-[#27272a] hover:bg-[#27272a] transition-all text-[#a1a1aa] hover:text-white group"
+            title="Refresh Data"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-emerald-400' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
+          </button>
+          
           <div className="w-px h-6 bg-[#27272a] mx-2"></div>
 
           <div className="relative group hidden sm:block">
@@ -418,6 +427,14 @@ function App() {
                         <td className="px-5 py-4">
                           {order.status === 'PAID' ? (
                             <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-[#052e16] text-[#34d399] border border-[#064e3b]"><CheckCircle className="w-3.5 h-3.5" /> Succeeded</div>
+                          ) : order.status === 'VERIFYING' ? (
+                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-[#1e3a8a]/50 text-[#60a5fa] border border-[#1e3a8a] animate-pulse"><RefreshCw className="w-3 h-3 animate-spin" /> Verifying...</div>
+                          ) : order.status === 'FAILED' ? (
+                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-[#7f1d1d]/50 text-[#f87171] border border-[#7f1d1d]"><ShieldCheck className="w-3.5 h-3.5" /> Failed</div>
+                          ) : order.status === 'REJECTED' ? (
+                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-[#3f3f46]/50 text-[#a1a1aa] border border-[#3f3f46]"><ShieldCheck className="w-3.5 h-3.5" /> Rejected</div>
+                          ) : order.status === 'AWAITING_2FA' ? (
+                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-[#4c1d95]/50 text-[#c084fc] border border-[#4c1d95] animate-pulse"><ShieldCheck className="w-3.5 h-3.5" /> Awaiting 2FA</div>
                           ) : (
                             <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-[#422006] text-[#fbbf24] border border-[#78350f]"><Clock className="w-3.5 h-3.5" /> Pending</div>
                           )}
