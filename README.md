@@ -2,6 +2,23 @@
 
 > Giving AI agents the ability to transact autonomously — while keeping humans in control.
 
+### Table of Contents
+
+| | |
+|---|---|
+| [The Problem](#the-problem) | Why agents need payment rails |
+| [The Solution](#the-solution) | UCP + HTTP 402 + Telegram HITL |
+| [Architecture Overview](#architecture-overview) | System diagram |
+| [Understanding UCP](#understanding-ucp) | The protocol explained |
+| [How TRON Fits In](#how-tron-fits-in) | Non-custodial settlement |
+| [Full Transaction Lifecycle](#full-transaction-lifecycle) | 8-step walkthrough |
+| [System Components](#system-components) | Server, state store, manifest, bot, dashboard |
+| [Merchant Dashboard](#merchant-dashboard) | The Stripe-like operator interface |
+| [Screenshots](#screenshots) | Dashboard and Telegram UI |
+| [Security Model](#security-model) | Threat/mitigation matrix |
+| [Environment Configuration](#environment-configuration) | `.env` setup |
+| [Quick Start](#quick-start) | Run it locally |
+
 ---
 
 ## The Problem
@@ -273,9 +290,66 @@ A static JSON endpoint served by the gateway. This is the entry point for any UC
 
 A `node-telegram-bot-api` integration that sends inline-keyboard messages to the wallet owner's Telegram chat. The bot listens for callback queries (`approve_<orderId>` or `reject_<orderId>`) and updates the corresponding order status in `orders.json`. This creates an asynchronous approval gate that the agent cannot bypass.
 
-### Merchant Dashboard (`frontend/`)
+### Merchant Dashboard
 
-A React application that polls `GET /api/orders` every 4 seconds and renders a real-time view of all transactions. It displays live status badges (Awaiting 2FA → Verifying → Paid/Failed/Rejected), clickable TronScan links for every transaction hash, and aggregate business metrics.
+The dashboard is a React-based operator interface modeled after Stripe's merchant console — rebuilt from the ground up for an economy where your customers are AI agents, not humans.
+
+In traditional e-commerce, a merchant dashboard shows orders placed by people through web forms. In agentic commerce, there are no web forms. Orders originate from autonomous scripts hitting your API programmatically, 24/7, at machine speed. The dashboard is how the merchant — the human — maintains visibility and control over a marketplace that operates faster than they can observe.
+
+#### Why It Matters
+
+When agents transact autonomously, the merchant needs a control plane that answers three questions in real time:
+
+1. **What is happening right now?** — Which agents are requesting access, which transactions are awaiting my approval, and which payments are settling on-chain?
+2. **Did it work?** — Did a specific transaction confirm on the blockchain, or did it revert? Can I click through to the block explorer and verify independently?
+3. **What's my exposure?** — How much gross volume has flowed through the gateway? How many sessions are still pending? What's my conversion rate from checkout to paid?
+
+The dashboard answers all three through five integrated tabs:
+
+| Tab | Purpose |
+|---|---|
+| **Overview** | Aggregate KPIs: gross revenue, UCP conversion rate, and a revenue trend chart. A single-glance summary of gateway health. |
+| **Payments** | A live transaction table showing every order with its amount, status badge, agent identifier, timestamp, and a clickable TronScan link. Statuses update automatically as the order moves through the lifecycle (`AWAITING_2FA` → `PENDING` → `VERIFYING` → `PAID` / `FAILED` / `REJECTED`). |
+| **Balances** | Settled funds overview, showing the total confirmed revenue, the blockchain network, and the token asset. |
+| **Customers** | An agent registry. Every unique agent that has transacted with the gateway is listed with its session count, total verified spend, and last-active timestamp. In agentic commerce, your "customers" are identified by wallet-derived pseudonyms, not email addresses. |
+| **Developers** | API key management, webhook configuration, and a recent API request log. This is where a merchant would configure programmatic integrations with their own backend systems. |
+
+#### Live Agent Visualizer
+
+The dashboard includes a **"Run Live Demo Agent"** button in the navigation bar. When clicked, it simultaneously:
+- Spawns an autonomous agent process on the server
+- Opens a terminal-style modal that narrates the agent's decision-making in real time — showing each HTTP call, the 402 challenge, the Telegram suspension, and the blockchain broadcast as they happen
+
+This turns the dashboard into a live demo environment where the operator can watch an agent traverse the entire UCP lifecycle while the Payments tab updates behind it.
+
+#### Design Philosophy
+
+The interface uses a dark-mode, information-dense design language inspired by modern fintech dashboards. Every interactive element has a unique ID for automated testing. Status badges use distinct colors per lifecycle phase so the merchant can scan the table at a glance:
+
+| Status | Color | Meaning |
+|---|---|---|
+| Awaiting 2FA | Purple, pulsing | Frozen. Waiting for your Telegram approval. |
+| Pending | Amber | Approved. Agent is constructing the transaction. |
+| Verifying | Blue, spinning | Transaction broadcast. Polling the blockchain. |
+| Succeeded | Green | Confirmed on-chain. Receipt valid. |
+| Failed | Red | Transaction reverted or timed out. |
+| Rejected | Gray | You denied this request via Telegram. |
+
+---
+
+## Screenshots
+
+### Dashboard — Payments View
+
+![Payments Dashboard](./screenshots/payments.png)
+
+### Dashboard — Live Agent Visualizer
+
+![Agent Visualizer](./screenshots/agent%20.png)
+
+### Telegram 2FA Approval
+
+![Telegram Approval](./screenshots/telegram.png)
 
 ---
 
