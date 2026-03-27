@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const { exec } = require('child_process');
 const { TronWeb } = require('tronweb');
 const db = require('./db');
 
@@ -163,6 +164,19 @@ app.get('/api/orders', (req, res) => {
     // Sort descending by createdAt
     orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     res.json(orders);
+});
+
+/**
+ * 5. Demo Endpoint for Visual UI
+ */
+app.post('/api/demo/run-agent', (req, res) => {
+    exec('node test-agent.js', (error, stdout, stderr) => {
+        if (error) {
+            console.error(error.message);
+            return res.status(500).json({ error: error.message, logs: stderr });
+        }
+        res.json({ success: true, logs: stdout });
+    });
 });
 
 app.listen(PORT, () => {
