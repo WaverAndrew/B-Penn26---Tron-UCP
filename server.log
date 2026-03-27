@@ -1,0 +1,15 @@
+[dotenv@17.3.1] injecting env (3) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+/Users/andre/Desktop/Coding/upenn26/tron-ucp/server.js:16
+const tronWeb = new TronWeb({
+                ^
+
+TypeError: TronWeb is not a constructor
+    at Object.<anonymous> (/Users/andre/Desktop/Coding/upenn26/tron-ucp/server.js:16:17)
+    at Module._compile (node:internal/modules/cjs/loader:1358:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1416:10)
+    at Module.load (node:internal/modules/cjs/loader:1208:32)
+    at Module._load (node:internal/modules/cjs/loader:1024:12)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:174:12)
+    at node:internal/main/run_main_module:28:49
+
+Node.js v20.13.1
