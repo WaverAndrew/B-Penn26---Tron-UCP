@@ -21,16 +21,21 @@ function AgentDemoModal({ isOpen, onClose }) {
     fetch('http://localhost:3000/api/demo/run-agent', { method: 'POST' }).catch(console.error);
 
     const simulationSteps = [
-      { msg: 'Agent initialized on port 8080.', delay: 500, icon: <Terminal className="w-4 h-4 text-gray-400" /> },
-      { msg: 'Fetching Merchant UCP Manifest via `/.well-known/ucp`...', delay: 1000, icon: <Search className="w-4 h-4 text-blue-400" /> },
-      { msg: 'Manifest received. Capabilities: [dev.ucp.checkout]', delay: 2000, icon: <CheckCircle className="w-4 h-4 text-emerald-400" /> },
-      { msg: 'Negotiating cart intent. Received challenge for 15,000,000 Sun (15 USDT)', delay: 2500, icon: <Wallet className="w-4 h-4 text-amber-400" /> },
-      { msg: 'Requesting permission to sign TRC20 transfer...', delay: 3500, icon: <ShieldCheck className="w-4 h-4 text-indigo-400" /> },
-      { msg: 'Signing transaction using native TronWeb enclave...', delay: 4500, icon: <RefreshCw className="w-4 h-4 text-gray-400 animate-spin" /> },
-      { msg: 'Broadcasting onto Nile Testnet...', delay: 6000, icon: <Activity className="w-4 h-4 text-purple-400" /> },
-      { msg: 'Awaiting 5s propagation block...', delay: 7500, icon: <Clock className="w-4 h-4 text-amber-400 animate-pulse" /> },
-      { msg: 'Ping /.complete endpoint with Transaction Hash...', delay: 12500, icon: <Target className="w-4 h-4 text-blue-400" /> },
-      { msg: 'Backend verification successful! Order complete.', delay: 13500, icon: <CheckCircle className="w-4 h-4 text-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]" /> }
+      { msg: '[LLM] Agent initialized on port 8080.', delay: 500, icon: <Terminal className="w-4 h-4 text-gray-400" /> },
+      { msg: '[LLM] Attempting to fetch Premium AI API (`GET /api/premium-data`)...', delay: 2000, icon: <Search className="w-4 h-4 text-blue-400" /> },
+      { msg: '[LLM] Analyzing response... HTTP 402 Payment Required.', delay: 4500, icon: <ShieldCheck className="w-4 h-4 text-red-400" /> },
+      { msg: '[LLM] Browsing WWW-Authenticate header. Extracting UCP manifest URL.', delay: 7000, icon: <Search className="w-4 h-4 text-blue-400" /> },
+      { msg: 'Fetching Universal Commerce Protocol Manifest...', delay: 9000, icon: <CheckCircle className="w-4 h-4 text-emerald-400" /> },
+      { msg: '[LLM] Manifest parsed. Intent matched: dev.ucp.checkout on TRON Network.', delay: 12500, icon: <CheckCircle className="w-4 h-4 text-emerald-400" /> },
+      { msg: '[LLM] Generating HTTP POST to Request checkout session for 15.00 USDT...', delay: 15500, icon: <Wallet className="w-4 h-4 text-amber-400" /> },
+      { msg: '🔒 Checkout suspended by Merchant API. Check your phone!', delay: 16500, icon: <ShieldCheck className="w-4 h-4 text-red-500" /> },
+      { msg: 'Awaiting human cryptographic approval via Telegram...', delay: 18000, icon: <RefreshCw className="w-4 h-4 text-gray-400 animate-spin" /> },
+      { msg: '🔓 2FA Hit Received! Challenge unlocked.', delay: 30000, icon: <CheckCircle className="w-4 h-4 text-emerald-400" /> },
+      { msg: '[LLM] Analyzing payload parameters... Target: TXYZopYRdj...', delay: 33000, icon: <Search className="w-4 h-4 text-blue-400" /> },
+      { msg: '[LLM] Formatting TRC20 15 USDT smart contract payload...', delay: 36000, icon: <Activity className="w-4 h-4 text-purple-400" /> },
+      { msg: 'Cryptographically signing & broadcasting to Nile Testnet...', delay: 38500, icon: <Terminal className="w-4 h-4 text-blue-400" /> },
+      { msg: 'Submitting receipt to Gateway. Exchanging for Premium Data...', delay: 43000, icon: <Target className="w-4 h-4 text-blue-400" /> },
+      { msg: 'Receipt validated. Premium payload decrypted successfully.', delay: 45000, icon: <CheckCircle className="w-4 h-4 text-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]" /> }
     ];
 
     let currentSteps = [];
@@ -44,7 +49,7 @@ function AgentDemoModal({ isOpen, onClose }) {
     setTimeout(() => {
       setIsInjecting(false);
       setIsFinished(true);
-    }, 14500);
+    }, 46000);
   };
 
   if (!isOpen) return null;

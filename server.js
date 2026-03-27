@@ -280,13 +280,8 @@ app.post('/api/demo/approve-2fa/:orderId', (req, res) => {
  * 7. Demo Endpoint for Visual UI
  */
 app.post('/api/demo/run-agent', (req, res) => {
-    exec('node test-agent.js', (error, stdout, stderr) => {
-        if (error) {
-            console.error(error.message);
-            return res.status(500).json({ error: error.message, logs: stderr });
-        }
-        res.json({ success: true, logs: stdout });
-    });
+    exec('node test-agent.js'); // Fire and forget so we don't hang the modal 
+    res.json({ success: true, message: "Agent spawned in background" });
 });
 
 app.listen(PORT, () => {
