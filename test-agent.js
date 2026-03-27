@@ -1,121 +1,144 @@
 require('dotenv').config();
-const axios = require('axios');
 const { TronWeb } = require('tronweb');
+const axios = require('axios');
 
-const BASE_URL = 'http://localhost:3000';
-const PRIVATE_KEY = process.env.TRON_PRIVATE_KEY;
+const MERCHAT_BASE_URL = 'http://localhost:3000';
+const AGENT_ID = `agent-${Math.random().toString(36).substring(7)}`;
 
-if (!PRIVATE_KEY || PRIVATE_KEY === 'your_private_key_here') {
-    console.error("❌ Please set a valid TRON_PRIVATE_KEY in your .env file.");
-    process.exit(1);
-}
-
-// Initialize TronWeb (Nile Testnet)
 const tronWeb = new TronWeb({
-    fullNode: 'https://nile.trongrid.io',
-    solidityNode: 'https://nile.trongrid.io',
-    eventServer: 'https://nile.trongrid.io',
-    privateKey: PRIVATE_KEY
+    fullHost: 'https://nile.trongrid.io',
+    privateKey: process.env.TRON_PRIVATE_KEY
 });
 
-// Nile Testnet USDT Contract Address
-const USDT_CONTRACT_ADDRESS = 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf'; 
+// Sleep helper function
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 async function runMockAgent() {
-    console.log("🤖 --- UCP Mock Agent Started ---");
-    
-    const walletAddress = tronWeb.address.fromPrivateKey(PRIVATE_KEY);
-    console.log(`🤖 Agent Wallet Address: ${walletAddress}`);
+    console.log(`\n[AGENT ${AGENT_ID}] Booting up autonomous VM...\n`);
 
     try {
-        // Step 1: Discovery
-        console.log("\n🔍 Step 1: Fetching UCP Manifest...");
-        const manifestRes = await axios.get(`${BASE_URL}/.well-known/ucp`);
-        const manifest = manifestRes.data;
-        console.log("✅ Manifest received:");
-        console.log(manifest);
-
-        if (!manifest.capabilities.includes("dev.ucp.checkout") || manifest.payment_handler !== "TRC20_USDT") {
-            console.error("❌ Merchant does not support required UCP capabilities.");
-            return;
-        }
-
-        // Step 2: Checkout Create
-        console.log("\n🛒 Step 2: Creating Checkout Session...");
-        const checkoutPayload = {
-            items: [{ id: "ai-api-call", qty: 1000 }],
-            currency: "USDT",
-            total_amount: 15 // 15 USDT
-        };
-        const checkoutRes = await axios.post(`${BASE_URL}/api/ucp/checkout/create`, checkoutPayload);
-        const { orderId, payment_challenge } = checkoutRes.data;
-        
-        console.log(`✅ Checkout successful. Order ID: ${orderId}`);
-        console.log("   Payment Challenge:", payment_challenge);
-
-        // Step 3: Agent signs and broadcasts the transaction
-        console.log("\n✍️ Step 3: Agent signing and sending TRC20 transfer on Nile Testnet...");
-        
-        // Execute the transfer without fetching ABI
-        let transactionHash;
+        // Step 1: Attempt to access a premium resource WITHOUT paying.
+        console.log(`[AGENT] Attempting to fetch premium AI API data at GET /api/premium-data...`);
+        let ucpManifestUrl = null;
         try {
-            console.log(`   Transferring ${payment_challenge.amount} Sun to ${payment_challenge.receiver_address}...`);
-            const functionSelector = 'transfer(address,uint256)';
-            const parameter = [
-                { type: 'address', value: payment_challenge.receiver_address },
-                { type: 'uint256', value: payment_challenge.amount }
-            ];
-            
-            const transaction = await tronWeb.transactionBuilder.triggerSmartContract(
-                USDT_CONTRACT_ADDRESS,
-                functionSelector,
-                { feeLimit: 100_000_000 },
-                parameter,
-                walletAddress
-            );
-            
-            if (!transaction.result || !transaction.result.result) {
-                console.error("❌ Failed to build transaction:", transaction);
+            await axios.get(`${MERCHAT_BASE_URL}/api/premium-data`);
+        } catch (error) {
+            if (error.response && error.response.status === 402) {
+                console.log(`[AGENT] Received HTTP 402 Payment Required!`);
+                console.log(`[AGENT] The server requires a UCP payment receipt. Extracting WWW-Authenticate header...`);
+                
+                const wwwAuth = error.response.headers['www-authenticate'];
+                // Clean the WWW-Authenticate header to extract the UCP URL
+                if (wwwAuth && wwwAuth.includes('UCP url=')) {
+                    ucpManifestUrl = wwwAuth.split('url="')[1].split('"')[0];
+                    console.log(`[AGENT] Discovered UCP Manifest URL: ${ucpManifestUrl}\n`);
+                } else {
+                    ucpManifestUrl = error.response.data.ucp_manifest;
+                }
+            } else {
+                console.error(`[AGENT] Unexpected Error:`, error.message);
                 return;
             }
+        }
 
-            const signedTransaction = await tronWeb.trx.sign(transaction.transaction, PRIVATE_KEY);
-            const broadcast = await tronWeb.trx.sendRawTransaction(signedTransaction);
-            
-            if (!broadcast.result) {
-                console.error("❌ Broadcast failed:", broadcast);
-                return;
-            }
-            
-            transactionHash = broadcast.transaction.txID;
-            console.log(`   Transaction broadcasted! Hash: ${transactionHash}`);
-        } catch (txError) {
-            console.error("❌ Failed to broadcast transaction. Make sure the agent has enough Nile TRX and Nile USDT.");
-            // If the user hasn't funded the wallet, we still want to show them the code flow.
-            console.error(txError);
+        if (!ucpManifestUrl) {
+            console.error(`[AGENT] Could not discover UCP Manifest. Aborting payment.`);
             return;
         }
 
-        // Step 4: Verification / Completion
-        console.log("\n📡 Step 4: Notifying merchant of completion...");
-        console.log("   Waiting 5 seconds for network propagation before verifying...");
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        // Step 2: Fetch the Manifest
+        console.log(`[AGENT] Fetching Universal Commerce Protocol Manifest...`);
+        const manifestRes = await axios.get(ucpManifestUrl);
+        const manifest = manifestRes.data;
+        if (!manifest.capabilities.includes('dev.ucp.checkout')) {
+            console.log(`[AGENT] Merchant does not support checkout. Aborting.`);
+            return;
+        }
         
-        const completeRes = await axios.post(`${BASE_URL}/api/ucp/checkout/complete`, {
-            orderId: orderId,
-            transactionHash: transactionHash
+        console.log(`[AGENT] Manifest received. Proceeding to UCP Checkout Creation.\n`);
+        const checkoutUrl = `${MERCHAT_BASE_URL}/api/ucp/checkout/create`;
+        
+        const items = [{ id: 'premium_data_access', quantity: 1, price: 15.00 }];
+        console.log(`[AGENT] Requesting checkout for 15.00 USDT...`);
+        
+        const createRes = await axios.post(checkoutUrl, {
+            items,
+            total_amount: 15.00,
+            chain: 'TRON_NILE',
+            currency: 'USDT',
+            customer_hash: AGENT_ID
         });
 
-        console.log("✅ Payment Verified by Merchant Response:");
-        console.log(completeRes.data);
-        console.log("\n🎉 Flow Complete!");
+        const challenge = createRes.data;
+        console.log(`[AGENT] Received UCP Checkout Challenge!`);
+        console.log(`    Order ID: ${challenge.orderId}`);
+        console.log(`    Pay To:   ${challenge.payment_challenge.receiver_address}`);
+        console.log(`    Amount:   ${challenge.payment_challenge.amount} SUN (15 USDT)\n`);
 
-    } catch (error) {
-        console.error("❌ Agent Flow Error:");
-        if (error.response) {
-            console.error(error.response.data);
+        // Step 4: Autonomous Crypto Wallet Interaction (TRC-20 Transfer)
+        const trc20ContractAddress = 'TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj'; // Nile USDT
+        const destinationAddress = challenge.payment_challenge.receiver_address;
+        const amountSun = parseInt(challenge.payment_challenge.amount);
+
+        console.log(`[AGENT] Requesting enclave permission to sign TRC-20 Transaction...`);
+        await sleep(1000); // Simulate enclave UX
+        
+        const parameter = [
+            { type: 'address', value: destinationAddress },
+            { type: 'uint256', value: amountSun }
+        ];
+        
+        console.log(`[AGENT] Building TRC-20 triggerSmartContract payload...`);
+        const ownerAddress = tronWeb.defaultAddress.base58;
+        
+        const transaction = await tronWeb.transactionBuilder.triggerSmartContract(
+            trc20ContractAddress,
+            'transfer(address,uint256)',
+            {},
+            parameter,
+            ownerAddress
+        );
+
+        console.log(`[AGENT] Cryptographically signing raw transaction...`);
+        const signedTx = await tronWeb.trx.sign(transaction.transaction);
+        
+        console.log(`[AGENT] Broadcasting payload to the TRON Nile Testnet...\n`);
+        const receipt = await tronWeb.trx.sendRawTransaction(signedTx);
+        const txHash = signedTx.txID;
+        console.log(`[AGENT] => Broadcast Successful! Transaction Hash: ${txHash}`);
+        console.log(`[AGENT] Waiting 5 seconds for block propagation...\n`);
+        await sleep(5000); 
+
+        // Step 5: Notify Merchant Backend to verify txHash
+        console.log(`[AGENT] Pinging UCP checkout/complete endpoint to verify Payment Challenge...`);
+        const completeUrl = `${MERCHAT_BASE_URL}/api/ucp/checkout/complete`;
+        
+        const completeRes = await axios.post(completeUrl, {
+            orderId: challenge.orderId,
+            transactionHash: txHash
+        });
+
+        console.log(`[AGENT] Verification successful! Order Status: ${completeRes.data.status}\n`);
+
+        // Step 6: Use the Receipt on the Premium Web API!
+        console.log(`[AGENT] Exchanging cryptographic verification receipt (txHash) for raw AI Payload...`);
+        
+        const premiumRes = await axios.get(`${MERCHAT_BASE_URL}/api/premium-data`, {
+            headers: {
+                'Authorization': `UCP ${txHash}`
+            }
+        });
+
+        console.log(`[AGENT] SUCCESS! HTTP 200 OK.`);
+        console.log(`[AGENT] Payload Data Received:`);
+        console.log(JSON.stringify(premiumRes.data.data, null, 2));
+        console.log(`\n[AGENT ${AGENT_ID}] Flow Completed Succesfully. Terminating VM.\n`);
+
+    } catch (e) {
+        if (e.response) {
+            console.error(`[AGENT] Execution Error: ${e.response.status} - ${JSON.stringify(e.response.data)}`);
         } else {
-            console.error(error.message);
+            console.error(`[AGENT] Execution Error: ${e.message}`);
         }
     }
 }

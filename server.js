@@ -167,7 +167,48 @@ app.get('/api/orders', (req, res) => {
 });
 
 /**
- * 5. Demo Endpoint for Visual UI
+ * 5. Premium API Gate (HTTP 402 Payment Required)
+ * Demonstrates the x402-inspired AI micropayment wall.
+ */
+app.get('/api/premium-data', (req, res) => {
+    const authHeader = req.headers['authorization'];
+    
+    // Check if the agent presented a valid UCP payment receipt (in this PoC, a txHash)
+    if (!authHeader || !authHeader.startsWith('UCP ')) {
+        res.setHeader('WWW-Authenticate', `UCP url="http://localhost:${PORT}/.well-known/ucp"`);
+        return res.status(402).json({
+            error: "Payment Required",
+            message: "This is a premium AI API endpoint. Please complete a UCP checkout session to generate a payment receipt.",
+            cost: "15 USDT",
+            currency: "TRX_USDT",
+            ucp_manifest: `http://localhost:${PORT}/.well-known/ucp`
+        });
+    }
+
+    const receiptTxHash = authHeader.split(' ')[1];
+    
+    // Verify the receipt against our database
+    const orders = db.getOrders();
+    const validOrder = orders.find(o => o.txHash === receiptTxHash && o.status === 'PAID');
+    
+    if (!validOrder) {
+        return res.status(403).json({ error: "Forbidden", message: "Invalid or unconfirmed UCP payment receipt." });
+    }
+
+    // Success! Return the premium AI payload
+    return res.status(200).json({
+        success: true,
+        data: {
+            confidential_ai_model_weights: "0x8fa9b2...34df",
+            weather_forecast: "72°F and sunny in Silicon Valley",
+            alpha_signals: ["LONG $TRX", "SHORT $FIAT"]
+        },
+        receipt_used: receiptTxHash
+    });
+});
+
+/**
+ * 6. Demo Endpoint for Visual UI
  */
 app.post('/api/demo/run-agent', (req, res) => {
     exec('node test-agent.js', (error, stdout, stderr) => {
