@@ -6,6 +6,7 @@
 
 | | |
 |---|---|
+| [**⚡ Get Started in 3 Minutes**](#-get-started-in-3-minutes) | **Clone → Configure → Run** |
 | [The Problem](#the-problem) | Why agents need payment rails |
 | [The Solution](#the-solution) | UCP + HTTP 402 + Telegram HITL |
 | [Architecture Overview](#architecture-overview) | System diagram |
@@ -16,8 +17,94 @@
 | [Merchant Dashboard](#merchant-dashboard) | The Stripe-like operator interface |
 | [Screenshots](#screenshots) | Dashboard and Telegram UI |
 | [Security Model](#security-model) | Threat/mitigation matrix |
-| [Environment Configuration](#environment-configuration) | `.env` setup |
-| [Quick Start](#quick-start) | Run it locally |
+
+---
+
+## ⚡ Get Started in 3 Minutes
+
+> **No smart-contract deployment. No wallet custody. No complex infrastructure.**
+> Plug in four environment variables and you're live.
+
+### Prerequisites
+
+| Tool | Version | Why |
+|---|---|---|
+| **Node.js** | ≥ 18 | Runtime for the gateway server and dashboard |
+| **npm** | ≥ 9 | Comes with Node — manages dependencies |
+| **Telegram** | Any | You'll receive 2FA approval requests here |
+| **TRON Wallet** | Nile Testnet | Your merchant receiving address ([get one free](https://nileex.io/join/getJoinPage)) |
+
+### Step 1 — Clone & Install
+
+```sh
+git clone https://github.com/<your-org>/tron-ucp.git
+cd tron-ucp
+npm install              # installs the gateway server
+cd frontend && npm install && cd ..   # installs the dashboard
+```
+
+That's it — two `npm install` commands, zero native dependencies.
+
+### Step 2 — Configure (one file)
+
+Copy the example environment file and fill in your values:
+
+```sh
+cp .env.example .env
+```
+
+Then open `.env` and set these four variables:
+
+```env
+# ── Your TRON Nile Testnet wallet (where you receive payments)
+MERCHANT_ADDRESS=TYourWalletAddressHere
+
+# ── Private key for the demo agent (test key only — NOT your merchant key)
+TRON_PRIVATE_KEY=your_test_agent_private_key
+
+# ── Telegram bot token (create one via @BotFather in ~30 seconds)
+TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
+
+# ── Your personal Telegram chat ID (send /start to @userinfobot to get it)
+TELEGRAM_CHAT_ID=123456789
+```
+
+> **💡 Where do I get these?**
+>
+> | Value | How to get it |
+> |---|---|
+> | `MERCHANT_ADDRESS` | Install TronLink or use [Nile Faucet](https://nileex.io/join/getJoinPage) — copy your base58 address |
+> | `TRON_PRIVATE_KEY` | Export from TronLink, or generate a test key at [tronweb docs](https://tronweb.network) |
+> | `TELEGRAM_BOT_TOKEN` | Open Telegram → search **@BotFather** → `/newbot` → copy the token |
+> | `TELEGRAM_CHAT_ID` | Open Telegram → search **@userinfobot** → `/start` → copy the ID |
+
+### Step 3 — Run
+
+```sh
+# Terminal 1 — Start the UCP gateway
+node server.js
+
+# Terminal 2 — Start the merchant dashboard
+cd frontend && npm run dev
+```
+
+Open **http://localhost:5173** — your merchant dashboard is live. 🎉
+
+Hit the **"Run Live Demo Agent"** button to see a full payment lifecycle in real time, right from the dashboard.
+
+### What Just Happened?
+
+In under 3 minutes you now have:
+- ✅ A **UCP-compliant payment gateway** accepting TRC20 USDT on TRON Nile
+- ✅ A **Stripe-like merchant dashboard** with live transaction monitoring
+- ✅ A **Telegram 2FA firewall** — no payment goes through without your explicit tap
+- ✅ A **one-click demo agent** that runs the full checkout lifecycle end-to-end
+
+> **Ready for production?** Swap `TRON_NILE` for `TRON_MAINNET` in `server.js`, point `MERCHANT_ADDRESS` to your mainnet wallet, and you're accepting real payments.
+
+---
+
+> *The sections below explain the protocol, architecture, and security model in detail. The gateway is already running — read on when you're ready to go deeper.*
 
 ---
 
@@ -352,35 +439,6 @@ The interface uses a dark-mode, information-dense design language inspired by mo
 ![Telegram Approval](./screenshots/telegram.png)
 
 ---
-
-## Environment Configuration
-
-```env
-PORT=3000
-MERCHANT_ADDRESS=<your TRON wallet address>
-TRON_PRIVATE_KEY=<agent's private key for signing transactions>
-TELEGRAM_BOT_TOKEN=<from @BotFather>
-TELEGRAM_CHAT_ID=<your personal chat ID>
-```
-
-## Quick Start
-
-```sh
-# Install dependencies
-npm install
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your TRON and Telegram credentials
-
-# Start the gateway
-node server.js
-
-# In a separate terminal, start the dashboard
-cd frontend && npm install && npm run dev
-
-# Open http://localhost:5173 in your browser
-```
 
 ---
 
