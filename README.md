@@ -1,4 +1,4 @@
-# TRON UCP Gateway
+# Trongate
 
 > Giving AI agents the ability to transact autonomously — while keeping humans in control.
 
@@ -81,7 +81,7 @@ TELEGRAM_CHAT_ID=123456789
 ### Step 3 — Run
 
 ```sh
-# Terminal 1 — Start the UCP gateway
+# Terminal 1 — Start the Trongate server
 node server.js
 
 # Terminal 2 — Start the merchant dashboard
@@ -122,7 +122,7 @@ At the same time, giving an AI agent unrestricted access to a wallet is dangerou
 
 ## The Solution
 
-TRON UCP Gateway is a payment infrastructure layer built on the **TRON blockchain** that solves both problems through three interlocking systems:
+Trongate is a payment infrastructure layer built on the **TRON blockchain** that solves both problems through three interlocking systems:
 
 | Layer | Role |
 |---|---|
@@ -173,9 +173,11 @@ graph TB
 
 ## Understanding UCP
 
+> **Official sources:** [UCP Specification](https://ucp.dev) · [GitHub](https://github.com/Universal-Commerce-Protocol/ucp) · [JS SDK](https://github.com/Universal-Commerce-Protocol/js-sdk) · [Sample Implementations](https://github.com/Universal-Commerce-Protocol/samples)
+
 ### What is UCP?
 
-The Universal Commerce Protocol is a JSON manifest that a merchant server publishes at `/.well-known/ucp`. It is the equivalent of a restaurant putting its menu in the window — any agent walking by can read it and understand how to order without asking a waiter.
+The [Universal Commerce Protocol](https://ucp.dev) is an open standard co-developed by Google, Shopify, and other industry leaders to enable **agentic commerce** — allowing AI agents to discover, negotiate, and settle payments without custom integrations. A merchant server publishes a JSON manifest at `/.well-known/ucp`, the equivalent of a restaurant putting its menu in the window — any agent walking by can read it and understand how to order without asking a waiter.
 
 The manifest declares:
 
@@ -201,12 +203,12 @@ The manifest declares:
 
 Without UCP, an agent would need to be pre-programmed with every merchant's payment details — their wallet address, accepted tokens, network, and API structure. This doesn't scale.
 
-With UCP, **any agent can pay any merchant** by following three steps:
+With UCP, **any agent can pay any merchant** by following three steps (see the [Checkout capability spec](https://ucp.dev/latest/specification/playground/) for the full schema):
 1. Read the manifest at `/.well-known/ucp`
-2. Construct a checkout session using the declared schema
+2. Construct a checkout session using the declared [Checkout capability](https://ucp.dev)
 3. Settle the payment on the declared blockchain
 
-The protocol is blockchain-agnostic by design. This implementation uses TRON, but the same manifest structure could declare Ethereum, Solana, or any other network.
+The protocol is transport- and blockchain-agnostic by design — it supports REST, JSON-RPC, MCP, and A2A transports out of the box ([spec details](https://github.com/Universal-Commerce-Protocol/ucp)). This implementation uses TRON, but the same manifest structure could declare Ethereum, Solana, or any other network.
 
 ---
 
@@ -228,7 +230,7 @@ Below is the complete lifecycle of a single payment, from first contact to data 
 sequenceDiagram
     autonumber
     participant Agent as AI Agent
-    participant Gateway as UCP Gateway
+    participant Gateway as Trongate
     participant Human as Human (Telegram)
     participant TRON as TRON Network
 

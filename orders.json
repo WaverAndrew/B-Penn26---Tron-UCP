@@ -334,9 +334,10 @@
     "total_amount": 15,
     "amount_in_sun": 15000000,
     "currency": "USDT",
-    "status": "AWAITING_2FA",
+    "status": "REJECTED",
     "txHash": null,
-    "createdAt": "2026-03-27T20:11:30.915Z"
+    "createdAt": "2026-03-27T20:11:30.915Z",
+    "updatedAt": "2026-03-28T02:28:35.270Z"
   },
   {
     "id": "ORD-1774642314534-747",
@@ -350,8 +351,41 @@
     "total_amount": 15,
     "amount_in_sun": 15000000,
     "currency": "USDT",
-    "status": "AWAITING_2FA",
+    "status": "PENDING",
     "txHash": null,
-    "createdAt": "2026-03-27T20:11:54.534Z"
+    "createdAt": "2026-03-27T20:11:54.534Z",
+    "updatedAt": "2026-03-28T02:28:33.172Z"
+  },
+  {
+    "id": "ORD-1774665064720-246",
+    "items": [
+      {
+        "id": "test"
+      }
+    ],
+    "total_amount": 1,
+    "amount_in_sun": 1000000,
+    "currency": "USDT",
+    "status": "PENDING",
+    "txHash": null,
+    "createdAt": "2026-03-28T02:31:04.720Z",
+    "updatedAt": "2026-03-28T02:32:17.490Z"
+  },
+  {
+    "id": "ORD-1774665230039-902",
+    "items": [
+      {
+        "id": "premium_data_access",
+        "quantity": 1,
+        "price": 15
+      }
+    ],
+    "total_amount": 15,
+    "amount_in_sun": 15000000,
+    "currency": "USDT",
+    "status": "PAID",
+    "txHash": "7f0a73239c205d089ae346b09409b33760d1bd5fbc06e63b73959066f772cf61",
+    "createdAt": "2026-03-28T02:33:50.039Z",
+    "updatedAt": "2026-03-28T02:34:12.039Z"
   }
 ]

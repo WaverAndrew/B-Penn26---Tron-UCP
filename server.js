@@ -1,4 +1,5 @@
 require('dotenv').config();
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const { exec } = require('child_process');
@@ -9,6 +10,7 @@ const db = require('./db');
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use('/public', express.static(path.join(__dirname, 'public')));
 
 const PORT = process.env.PORT || 3000;
 const MERCHANT_ADDRESS = process.env.MERCHANT_ADDRESS || 'TWd4b1a2b3c4d5e6f7g8h9i0j1k2l3m4n5';
@@ -34,7 +36,7 @@ if (TELEGRAM_TOKEN) {
         console.log(`Your Chat ID is: ${msg.chat.id}`);
         console.log(`Please add TELEGRAM_CHAT_ID=${msg.chat.id} to your .env and restart the server!`);
         console.log(`====================================\n`);
-        bot.sendMessage(msg.chat.id, `Welcome to the UCP Gateway! Your Chat ID is ${msg.chat.id}. Add this to your .env file as TELEGRAM_CHAT_ID.`);
+        bot.sendMessage(msg.chat.id, `Welcome to Trongate! Your Chat ID is ${msg.chat.id}. Add this to your .env file as TELEGRAM_CHAT_ID.`);
     });
     
     bot.on('callback_query', (query) => {
@@ -64,11 +66,18 @@ if (TELEGRAM_TOKEN) {
 }
 
 /**
+ * UCP Explorer — human-readable manifest viewer for demos
+ */
+app.get('/ucp-explorer', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'ucp-explorer.html'));
+});
+
+/**
  * 1. UCP Discovery
  */
 app.get('/.well-known/ucp', (req, res) => {
     res.json({
-        name: "TRON Merchant PoC",
+        name: "Trongate",
         description: "A demonstration of UCP on TRON Nile Testnet",
         capabilities: ["dev.ucp.checkout"],
         payment_handler: "TRC20_USDT",
@@ -287,4 +296,5 @@ app.post('/api/demo/run-agent', (req, res) => {
 app.listen(PORT, () => {
     console.log(`Sever running on port ${PORT}`);
     console.log(`Manifest available at: http://localhost:${PORT}/.well-known/ucp`);
+    console.log(`UCP Explorer at: http://localhost:${PORT}/ucp-explorer`);
 });

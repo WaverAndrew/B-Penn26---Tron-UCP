@@ -2,7 +2,7 @@ require('dotenv').config();
 const { TronWeb } = require('tronweb');
 const axios = require('axios');
 
-const MERCHAT_BASE_URL = 'http://localhost:3000';
+const MERCHAT_BASE_URL = 'http://localhost:8000';
 const AGENT_ID = `agent-${Math.random().toString(36).substring(7)}`;
 
 const tronWeb = new TronWeb({
